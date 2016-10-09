@@ -1,2 +1,2 @@
 # Automart
-Automated test tools development
+Development of automated test tools for app on IOS and Android platform.
