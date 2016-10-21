@@ -27,9 +27,9 @@ public class testOpenCV{
 	    //设置原图
 	    macher.setSource("E:\\temp\\opencv\\src.jpg");
 	    //设置要匹配的图
-	    macher.setDst("E:\\temp\\opencv\\e.jpg");
+	    macher.setDst("E:\\temp\\opencv\\tmp_new_3.jpg");
 	    //设置输出结果的图
-	    macher.setOutput("E:\\temp\\opencv\\TMOutPut_5.png");
+	    macher.setOutput("E:\\temp\\opencv\\TMOutPut_3.jpg");
 	    
 	    macher.process();
 	}
@@ -102,16 +102,13 @@ class TemplateMaching {
 	    source = Imgcodecs.imread(sourcePath);
 	    dst = Imgcodecs.imread(dstPath);
 	    //创建于原图相同的大小，储存匹配度
-	    Mat result = Mat.zeros(source.rows(),source.cols(),CvType.CV_32FC1);
+	    Mat result = Mat.zeros(source.rows() - dst.width(), source.cols() - dst.height(), CvType.CV_32FC1);
 	    //调用模板匹配方法
-	    Imgproc.matchTemplate(source, dst, result,Imgproc.TM_SQDIFF);
+	    Imgproc.matchTemplate(source, dst, result,Imgproc.TM_CCOEFF_NORMED);
 	    //规格化
-	    Core.normalize(result, result, 0, 1,Core.NORM_MINMAX, -1);
-	    //获得最可能点，MinMaxLocResult是其数据格式，包括了最大、最小点的位置x、y
-	    MinMaxLocResult mlr = Core.minMaxLoc(result);
-	    Point matchLoc = mlr.minLoc;
-	    //在原图上的对应模板可能位置画一个绿色矩形
-	    Imgproc.rectangle(source, matchLoc, new Point(matchLoc.x + dst.width(),matchLoc.y + dst.height()),new Scalar(0,255,0));
+//	    Core.normalize(result, result, 0, 1,Core.NORM_MINMAX, -1);
+	    //根据匹配结果找到符合要求的图片，并画框
+	    findSimilar(result, 0.55);
 	    //将结果输出到对应位置
 	    File expectImageFile = new File(outputPath);
 		if (expectImageFile.exists())
@@ -124,5 +121,52 @@ class TemplateMaching {
 			}
 		}
 	    Imgcodecs.imwrite(outputPath,source);
+	}
+	
+	//查找符合匹配度的图片
+	public void findSimilar(Mat result, double similarity){
+		//获得最可能点，包括改点的坐标，相似度，MinMaxLocResult是其数据格式，包括了最大、最小点的位置x、y
+	    MinMaxLocResult mlr = Core.minMaxLoc(result);
+	    Point matchLoc = mlr.maxLoc;
+	    double maxLocX = mlr.maxLoc.x;
+	    double maxLocY = mlr.maxLoc.y;
+	    double minVal = mlr.minVal;
+	    double maxVal = mlr.maxVal;
+	    //在原图上的对应模板可能位置画一个绿色矩形
+	    if(maxVal >= similarity){
+	    	System.out.println("匹配到图像的坐标是：[" + maxLocX + "," + maxLocY + "]; minVal = " + minVal + "; maxVal = " + maxVal + "。");
+	    	Imgproc.rectangle(source, matchLoc, new Point(matchLoc.x + dst.width(),matchLoc.y + dst.height()),new Scalar(0,255,0));
+	    }
+		//将已经成功匹配找出的图像部分，从结果中剔除，避免下一次匹配时再次被找到
+		int startX = (int)matchLoc.x - dst.width() + 1;
+		int startY = (int)matchLoc.y - dst.height() + 1;
+		int endX = (int)matchLoc.x + dst.width() - 1;
+		int endY = (int)matchLoc.y + dst.height() - 1;
+		if(startX < 0){
+			startX =0;
+		}
+		if(startY < 0){
+			startY = 0;
+		}
+		if(endX > result.width() - 1){
+			endX = result.width() - 1;
+		}
+		if(endY > result.height() - 1){
+			endY = result.height();
+		}
+		int y, x;
+		for(y = startY; y < endY; y++){
+			for(x = startX; x < endX; x++){
+				result.put(y, x, minVal);
+			}
+		}
+		
+		//递归查找下一个符合匹配要求的图像起点坐标,并给图像画框
+		if(maxVal >= similarity){
+			findSimilar(result, similarity);
+		}
+		else{
+			return;
+		}
 	}
 }
